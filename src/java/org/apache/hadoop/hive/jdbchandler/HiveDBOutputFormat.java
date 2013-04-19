@@ -44,7 +44,8 @@ import org.apache.hadoop.util.StringUtils;
  * SQL query.
  *
  */
-public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable> implements HiveOutputFormat<K, V>,
+public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable> implements
+    HiveOutputFormat<K, V>,
     OutputFormat<K, V> {
 
   private static final Log LOG = LogFactory.getLog(HiveDBOutputFormat.class);
@@ -65,8 +66,8 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
       try {
         this.connection.setAutoCommit(false);
       } catch (SQLException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
+        LOG.error(StringUtils.stringifyException(e));
+        throw new RuntimeException(StringUtils.stringifyException(e));
       }
     }
 
@@ -77,7 +78,8 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
         rs.write(statement);
         statement.addBatch();
       } catch (SQLException e) {
-        e.printStackTrace();
+        LOG.error(StringUtils.stringifyException(e));
+        throw new IOException(StringUtils.stringifyException(e));
       }
 
     }
@@ -92,15 +94,18 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
         try {
           connection.rollback();
         } catch (SQLException ex) {
-          LOG.warn(StringUtils.stringifyException(ex));
+          LOG.error(StringUtils.stringifyException(ex));
+          throw new IOException(StringUtils.stringifyException(ex));
         }
-        throw new IOException(e.getMessage());
+        LOG.error(StringUtils.stringifyException(e));
+        throw new IOException(StringUtils.stringifyException(e));
       } finally {
         try {
           statement.close();
           connection.close();
         } catch (SQLException ex) {
-          throw new IOException(ex.getMessage());
+          LOG.error(StringUtils.stringifyException(ex));
+          throw new IOException(StringUtils.stringifyException(ex));
         }
       }
     }
@@ -142,6 +147,9 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
       }
     }
     query.append(");");
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Insert Query: " + query.toString());
+    }
 
     return query.toString();
   }
@@ -149,29 +157,14 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
   /** {@inheritDoc} */
   public void checkOutputSpecs(FileSystem filesystem, JobConf job)
       throws IOException {
-  }
-
-
-  /**
-   * Initializes the reduce-part of the job with the appropriate output settings
-   *
-   * @param job
-   *          The job
-   * @param tableName
-   *          The table to insert data into
-   * @param fieldNames
-   *          The field names in the table. If unknown, supply the appropriate
-   *          number of nulls.
-   */
-  public static void setOutput(JobConf job, String tableName, String... fieldNames) {
-    job.setOutputFormat(HiveDBOutputFormat.class);
-    job.setReduceSpeculativeExecution(false);
-
     DBConfiguration dbConf = new DBConfiguration(job);
-
-    dbConf.setOutputTableName(tableName);
-    dbConf.setOutputFieldNames(fieldNames);
+    String tableName = dbConf.getOutputTableName();
+    DBManager dbManager = new DBManager(dbConf.getConf());
+    if (dbManager.exists(tableName)) {
+      dbManager.truncateTable(tableName);
+    }
   }
+
 
   @Override
   public RecordWriter getHiveRecordWriter(
@@ -188,12 +181,11 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
       connection = new DBManager(dbConf.getConf()).getConnection();
       statement = connection.prepareStatement(constructQuery(tableName, fieldNames));
     } catch (SQLException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      LOG.error(StringUtils.stringifyException(e));
+      throw new IOException(StringUtils.stringifyException(e));
     }
 
     return new DBRecordWriter(connection, statement);
-
   }
 
   @Override

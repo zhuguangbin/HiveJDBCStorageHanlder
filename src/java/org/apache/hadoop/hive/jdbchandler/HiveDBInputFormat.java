@@ -24,8 +24,9 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.util.StringUtils;
 
-public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWritable>{
+public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWritable> {
 
   static final Log LOG = LogFactory.getLog(HiveDBInputFormat.class);
 
@@ -46,24 +47,23 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
 
       DatabaseMetaData dbMeta = connection.getMetaData();
       dbProductName = dbMeta.getDatabaseProductName().toUpperCase();
-    }
-    catch (SQLException ex) {
-      throw new RuntimeException(ex);
+    } catch (SQLException e) {
+      LOG.error(StringUtils.stringifyException(e));
+      throw new RuntimeException(StringUtils.stringifyException(e));
     }
 
     tableName = dbConf.getInputTableName();
     fieldNames = dbConf.getInputFieldNames();
-    if(fieldNames == null){
-   // configure read fields from query.
+    if (fieldNames == null) {
+      // configure read fields from query.
       List<Integer> readColIDs = ColumnProjectionUtils.getReadColumnIDs(conf);
       String jdbcColumnsMappingSpec = conf.get(JDBCSerDe.JDBC_COLUMNS_MAPPING);
       List<ColumnMapping> columnsMapping = null;
       try {
         columnsMapping = JDBCSerDe.parseColumnsMapping(jdbcColumnsMappingSpec);
       } catch (SerDeException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-        throw new RuntimeException(e.getMessage());
+        LOG.error(StringUtils.stringifyException(e));
+        throw new RuntimeException(StringUtils.stringifyException(e));
       }
 
       if (columnsMapping.size() < readColIDs.size()) {
@@ -77,14 +77,18 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
         for (int i : readColIDs) {
           fieldNames[i] = columnsMapping.get(i).getColumnName();
         }
-      }else {
+      } else {
         fieldNames = new String[columnsMapping.size()];
-        for (int i=0;i<columnsMapping.size();i++) {
+        for (int i = 0; i < columnsMapping.size(); i++) {
           fieldNames[i] = columnsMapping.get(i).getColumnName();
         }
       }
     }
     conditions = dbConf.getInputConditions();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("HiveDBInputFormat params : dbProductName=" + dbProductName + ", tableName="
+          + tableName + ", fieldNames=" + fieldNames + ", conditions=" + conditions);
+    }
   }
 
   @Override
@@ -124,7 +128,8 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
 
       return splits;
     } catch (SQLException e) {
-      throw new IOException(e.getMessage());
+      LOG.error(StringUtils.stringifyException(e));
+      throw new IOException(StringUtils.stringifyException(e));
     }
   }
 
@@ -134,7 +139,7 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
       Reporter reporter) throws IOException {
     // TODO Auto-generated method stub
     initialize(conf);
-    Class inputClass =  dbConf.getInputClass();
+    Class inputClass = dbConf.getInputClass();
 
     try {
       // use database product name to determine appropriate record reader.
@@ -154,17 +159,20 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
             conf, getConnection(), getDBConf(), conditions, fieldNames,
             tableName);
       }
-    } catch (SQLException ex) {
-      throw new IOException(ex.getMessage());
+    } catch (SQLException e) {
+      LOG.error(StringUtils.stringifyException(e));
+      throw new IOException(StringUtils.stringifyException(e));
     }
 
   }
 
-  /** Returns the query for getting the total number of rows,
-   * subclasses can override this for custom behaviour.*/
+  /**
+   * Returns the query for getting the total number of rows,
+   * subclasses can override this for custom behaviour.
+   */
   protected String getCountQuery() {
 
-    if(dbConf.getInputCountQuery() != null) {
+    if (dbConf.getInputCountQuery() != null) {
       return dbConf.getInputCountQuery();
     }
 
@@ -173,6 +181,9 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
 
     if (conditions != null && conditions.length() > 0) {
       query.append(" WHERE " + conditions);
+    }
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Count Query: " + query.toString());
     }
     return query.toString();
   }
@@ -191,7 +202,8 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
             Connection.TRANSACTION_SERIALIZABLE);
       }
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      LOG.error(StringUtils.stringifyException(e));
+      throw new RuntimeException(StringUtils.stringifyException(e));
     }
     return connection;
   }
@@ -221,7 +233,7 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
      * @param end
      *          the index of the last row to select
      */
-    public DBInputSplit(long start, long end , Path tablePath) {
+    public DBInputSplit(long start, long end, Path tablePath) {
       super(tablePath, 0, 0, EMPTY_ARRAY);
       this.start = start;
       this.end = end;
@@ -271,6 +283,11 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
       super.write(output);
       output.writeLong(start);
       output.writeLong(end);
+    }
+
+    @Override
+    public String toString() {
+      return "DBInputSplit, start: " + start + " , end : " + end;
     }
   }
 

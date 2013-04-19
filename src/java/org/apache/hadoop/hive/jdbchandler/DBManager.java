@@ -7,11 +7,16 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.jdbchandler.JDBCSerDe.ColumnMapping;
+import org.apache.hadoop.util.StringUtils;
 
 
 public class DBManager {
+
+  public static final Log LOG = LogFactory.getLog(DBManager.class);
 
   private final Configuration conf;
   private Connection connection;
@@ -32,13 +37,11 @@ public class DBManager {
         DBConfiguration dbconf = new DBConfiguration(conf);
         connection = dbconf.getConnection();
       } catch (ClassNotFoundException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-        throw new RuntimeException(e.getMessage());
+        LOG.error(StringUtils.stringifyException(e));
+        throw new RuntimeException(StringUtils.stringifyException(e));
       } catch (SQLException e) {
-        // TODO Auto-generated catch block
-        e.printStackTrace();
-        throw new RuntimeException(e.getMessage());
+        LOG.error(StringUtils.stringifyException(e));
+        throw new RuntimeException(StringUtils.stringifyException(e));
       }
     }
     return connection;
@@ -52,16 +55,21 @@ public class DBManager {
 
       ResultSet tables = dbm.getTables(null, null, tableName, null);
       if (tables.next()) {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Table " + tableName + "exists.");
+        }
         return true;
       } else {
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("Table " + tableName + " does not exist.");
+        }
         return false;
       }
 
     } catch (SQLException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
+      LOG.error(StringUtils.stringifyException(e));
+      throw new RuntimeException(StringUtils.stringifyException(e));
     }
-    return false;
   }
 
   public boolean createTable(String tableName, List<ColumnMapping> columnMappings) {
@@ -70,10 +78,14 @@ public class DBManager {
     query.append(" CREATE TABLE ").append(tableName).append(" (");
     for (ColumnMapping columnMapping : columnMappings) {
       query.append(columnMapping.columnName).append(" ").append(columnMapping.columnType)
+          .append("(").append(columnMapping.columnLength).append(")")
           .append(" COMMENT '").append(columnMapping.columnComments).append("',");
     }
     query.replace(query.lastIndexOf(","), query.lastIndexOf(",") + 1, ")");
 
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(query.toString());
+    }
 
     boolean exitStatus = false;
     Connection con = getConnection();
@@ -81,9 +93,8 @@ public class DBManager {
       Statement stmt = con.createStatement();
       exitStatus = stmt.execute(query.toString());
     } catch (SQLException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-      exitStatus = false;
+      LOG.error(StringUtils.stringifyException(e));
+      throw new RuntimeException(StringUtils.stringifyException(e));
     }
 
     return exitStatus;
@@ -95,15 +106,41 @@ public class DBManager {
     StringBuilder query = new StringBuilder();
     query.append(" DROP TABLE ").append(tableName);
 
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(query.toString());
+    }
+
     boolean exitStatus = false;
     Connection con = getConnection();
     try {
       Statement stmt = con.createStatement();
       exitStatus = stmt.execute(query.toString());
     } catch (SQLException e) {
-      // TODO Auto-generated catch block
-      e.printStackTrace();
-      exitStatus = false;
+      LOG.error(StringUtils.stringifyException(e));
+      throw new RuntimeException(StringUtils.stringifyException(e));
+    }
+
+    return exitStatus;
+
+  }
+
+  public boolean truncateTable(String tableName) {
+
+    StringBuilder query = new StringBuilder();
+    query.append(" TRUNCATE TABLE ").append(tableName);
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(query.toString());
+    }
+
+    boolean exitStatus = false;
+    Connection con = getConnection();
+    try {
+      Statement stmt = con.createStatement();
+      exitStatus = stmt.execute(query.toString());
+    } catch (SQLException e) {
+      LOG.error(StringUtils.stringifyException(e));
+      throw new RuntimeException(StringUtils.stringifyException(e));
     }
 
     return exitStatus;

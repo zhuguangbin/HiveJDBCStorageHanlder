@@ -4,11 +4,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.jdbchandler.JDBCSerDe.ColumnMapping;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
-import org.apache.hadoop.hive.metastore.api.Constants;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.metadata.DefaultStorageHandler;
@@ -29,7 +30,8 @@ import org.apache.hadoop.util.StringUtils;
 public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMetaHook,
     HiveStoragePredicateHandler {
 
-  final static public String DEFAULT_PREFIX = "default.";
+  public static final Log LOG = LogFactory.getLog(JDBCStorageHandler.class);
+
   private Configuration conf;
   private DBManager dbManager;
 
@@ -89,15 +91,7 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
     configureTableJobProperties(tableDesc, jobProperties);
 
     Properties tableProperties = tableDesc.getProperties();
-    String tableName =
-        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME);
-    if (tableName == null) {
-      tableName =
-          tableProperties.getProperty(Constants.META_TABLE_NAME);
-      if (tableName.startsWith(DEFAULT_PREFIX)) {
-        tableName = tableName.substring(DEFAULT_PREFIX.length());
-      }
-    }
+    String tableName = tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME);
 
     jobProperties.put(DBConfiguration.INPUT_TABLE_NAME_PROPERTY, tableName);
 
@@ -105,33 +99,34 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
 
   @Override
   public void configureOutputJobProperties(TableDesc tableDesc, Map<String, String> jobProperties) {
-    // TODO Auto-generated method stub
+
     configureTableJobProperties(tableDesc, jobProperties);
 
     Properties tableProperties = tableDesc.getProperties();
-    String tableName =
-        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME);
-    if (tableName == null) {
-      tableName =
-          tableProperties.getProperty(Constants.META_TABLE_NAME);
-      if (tableName.startsWith(DEFAULT_PREFIX)) {
-        tableName = tableName.substring(DEFAULT_PREFIX.length());
-      }
-    }
+    String tableName = tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME);
 
     jobProperties.put(DBConfiguration.OUTPUT_TABLE_NAME_PROPERTY, tableName);
+    jobProperties.put(DBConfiguration.OUTPUT_FIELD_NAMES_PROPERTY, tableProperties.getProperty(org.apache.hadoop.hive.serde.Constants.LIST_COLUMNS));
+
+    // set reduce number to 1 and disable specutive execution due to database transaction: when job failed, roll back
+    jobProperties.put("mapred.reduce.tasks", "1");
+    jobProperties.put("mapred.map.tasks.speculative.execution", "false");
   }
 
   @Override
   public void configureTableJobProperties(TableDesc tableDesc, Map<String, String> jobProperties) {
-    // TODO Auto-generated method stub
-    // configure table name, mapping, etc.
+
+    // enable driver generate simplified parameter metadata for PreparedStatements
+    // when no metadata is available either because the server couldn't support preparing the statement,
+    // or server-side prepared statements are disabled
+    final String URLPARAMS = "&generateSimpleParameterMetadata=true";
+
     Properties tableProperties = tableDesc.getProperties();
 
     jobProperties.put(DBConfiguration.DRIVER_CLASS_PROPERTY,
         tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS));
     jobProperties.put(DBConfiguration.URL_PROPERTY,
-        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL));
+        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL)+URLPARAMS);
 
     jobProperties.put(JDBCSerDe.JDBC_TABLE_NAME,
           tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME));
@@ -151,7 +146,6 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
 
     try {
 
-      String tableName = getJDBCTableName(tbl);
       List<ColumnMapping> columnsMapping = null;
 
       Map<String, String> serdeParam = tbl.getSd().getSerdeInfo().getParameters();
@@ -159,6 +153,7 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
       columnsMapping = JDBCSerDe.parseColumnsMapping(columnsMappingSpec);
 
       conf = initDBConfiguration(tbl);
+      String tableName = conf.get(JDBCSerDe.JDBC_TABLE_NAME);
       dbManager = new DBManager(conf);
 
       if (!dbManager.exists(tableName)) {
@@ -182,6 +177,7 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
       }
 
     } catch (SerDeException se) {
+      LOG.error(StringUtils.stringifyException(se));
       throw new MetaException(StringUtils.stringifyException(se));
     }
 
@@ -216,9 +212,8 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
     // TODO Auto-generated method stub
     boolean isExternal = MetaStoreUtils.isExternalTable(table);
 
-    String tableName = getJDBCTableName(table);
-
     conf = initDBConfiguration(table);
+    String tableName = conf.get(JDBCSerDe.JDBC_TABLE_NAME);
     dbManager = new DBManager(conf);
 
     if (dbManager.exists(tableName)) {
@@ -235,7 +230,7 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
     Map<String, String> tblParam = tbl.getParameters();
     String driverClassSpec = tblParam.get(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS);
     String urlSpec = tblParam.get(JDBCSerDe.JDBC_TABLE_URL);
-    String tableName = getJDBCTableName(tbl);
+    String tableName = tblParam.get(JDBCSerDe.JDBC_TABLE_NAME);
     String columnMappingSpec = tbl.getSd().getSerdeInfo().getParameters()
         .get(JDBCSerDe.JDBC_COLUMNS_MAPPING);
 
@@ -247,24 +242,5 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
     return conf;
 
   }
-
-  private String getJDBCTableName(Table tbl) {
-    // Give preference to TBLPROPERTIES over SERDEPROPERTIES
-    // (really we should only use TBLPROPERTIES, so this is just
-    // for backwards compatibility with the original specs).
-    String tableName = tbl.getParameters().get(JDBCSerDe.JDBC_TABLE_NAME);
-    if (tableName == null) {
-      tableName = tbl.getSd().getSerdeInfo().getParameters().get(
-          JDBCSerDe.JDBC_TABLE_NAME);
-    }
-    if (tableName == null) {
-      tableName = tbl.getDbName() + "." + tbl.getTableName();
-      if (tableName.startsWith(DEFAULT_PREFIX)) {
-        tableName = tableName.substring(DEFAULT_PREFIX.length());
-      }
-    }
-    return tableName;
-  }
-
 
 }

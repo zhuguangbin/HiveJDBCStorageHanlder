@@ -27,21 +27,24 @@ public class ResultSetByteArray {
   }
 
   class Column {
-    private int length;
+    private int type;
+    private int dataLength;
     private byte[] rawData;
-
-    public int getLength() {
-      return length;
+    public int getType() {
+      return type;
     }
-
-    public void setLength(int length) {
-      this.length = length;
+    public void setType(int type) {
+      this.type = type;
     }
-
+    public int getDataLength() {
+      return dataLength;
+    }
+    public void setDataLength(int dataLength) {
+      this.dataLength = dataLength;
+    }
     public byte[] getRawData() {
       return rawData;
     }
-
     public void setRawData(byte[] rawData) {
       this.rawData = rawData;
     }

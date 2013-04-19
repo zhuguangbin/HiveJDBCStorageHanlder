@@ -6,12 +6,15 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.jdbchandler.HiveDBInputFormat.DBInputSplit;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.lib.db.DBWritable;
 import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * A RecordReader that reads records from a SQL table.
@@ -19,6 +22,8 @@ import org.apache.hadoop.util.ReflectionUtils;
  * key and DBWritables as value.
  */
 public class DBRecordReader<T extends DBWritable> implements RecordReader<LongWritable, T> {
+
+  public static final Log LOG = LogFactory.getLog(DBRecordReader.class);
 
   private final Connection connection;
   private final ResultSet results;
@@ -92,6 +97,9 @@ public class DBRecordReader<T extends DBWritable> implements RecordReader<LongWr
 
     query.append(" LIMIT ").append(split.getLength());
     query.append(" OFFSET ").append(split.getStart());
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Select Query : " + query.toString());
+    }
     return query.toString();
   }
 
@@ -102,7 +110,8 @@ public class DBRecordReader<T extends DBWritable> implements RecordReader<LongWr
       results.close();
       statement.close();
     } catch (SQLException e) {
-      throw new IOException(e.getMessage());
+      LOG.error(StringUtils.stringifyException(e));
+      throw new IOException(StringUtils.stringifyException(e));
     }
   }
 
@@ -140,7 +149,8 @@ public class DBRecordReader<T extends DBWritable> implements RecordReader<LongWr
 
       pos++;
     } catch (SQLException e) {
-      throw new IOException(e.getMessage());
+      LOG.error(StringUtils.stringifyException(e));
+      throw new IOException(StringUtils.stringifyException(e));
     }
     return true;
   }

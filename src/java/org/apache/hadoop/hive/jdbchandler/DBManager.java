@@ -147,4 +147,24 @@ public class DBManager {
 
   }
 
+  public boolean executeQuery(String query){
+
+    if (LOG.isDebugEnabled()) {
+      LOG.debug(query.toString());
+    }
+
+    boolean exitStatus = false;
+    Connection con = getConnection();
+    try {
+      Statement stmt = con.createStatement();
+      exitStatus = stmt.execute(query.toString());
+    } catch (SQLException e) {
+      LOG.error(StringUtils.stringifyException(e));
+      throw new RuntimeException(StringUtils.stringifyException(e));
+    }
+
+    return exitStatus;
+
+  }
+
 }

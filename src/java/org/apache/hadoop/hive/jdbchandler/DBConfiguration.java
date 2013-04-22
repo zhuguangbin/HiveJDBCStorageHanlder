@@ -102,6 +102,15 @@ public class DBConfiguration {
   public static final String OUTPUT_FIELD_COUNT_PROPERTY =
     "mapreduce.jdbc.output.field.count";
 
+  /** When true, TRUNCATE TABLE before INSERT INTO. */
+  public static final String OUTPUT_TRUNCATE_PROPERTY =
+      "mapreduce.jdbc.output.truncateBeforeInsert";
+
+
+  /** When true, REPLACE INTO. false, INSERT INTO   */
+  public static final String OUTPUT_RELPACE_PROPERTY =
+      "mapreduce.jdbc.output.replace";
+
   /**
    * Sets the DB access related fields in the {@link Configuration}.
    * @param conf the configuration
@@ -260,7 +269,23 @@ public class DBConfiguration {
   }
 
   public int getOutputFieldCount() {
-    return conf.getInt(OUTPUT_FIELD_COUNT_PROPERTY, 0);
+    return conf.getInt(DBConfiguration.OUTPUT_FIELD_COUNT_PROPERTY, 0);
+  }
+
+  public void setOutputReplace(boolean replace){
+    conf.setBoolean(DBConfiguration.OUTPUT_RELPACE_PROPERTY, replace);
+  }
+
+  public boolean getOutputReplace(){
+    return conf.getBoolean(DBConfiguration.OUTPUT_RELPACE_PROPERTY, false);
+  }
+
+  public void setTruncateBeforeInsert(boolean truncate){
+    conf.setBoolean(DBConfiguration.OUTPUT_TRUNCATE_PROPERTY, truncate);
+  }
+
+  public boolean getTruncateBeforeInsert(){
+    return conf.getBoolean(DBConfiguration.OUTPUT_TRUNCATE_PROPERTY, false);
   }
 
 }

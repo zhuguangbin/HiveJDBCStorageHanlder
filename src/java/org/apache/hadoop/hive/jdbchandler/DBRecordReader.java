@@ -23,7 +23,7 @@ import org.apache.hadoop.util.StringUtils;
  */
 public class DBRecordReader<T extends DBWritable> implements RecordReader<LongWritable, T> {
 
-  public static final Log LOG = LogFactory.getLog(DBRecordReader.class);
+  private static final Log LOG = LogFactory.getLog(DBRecordReader.class);
 
   private final Connection connection;
   private final ResultSet results;

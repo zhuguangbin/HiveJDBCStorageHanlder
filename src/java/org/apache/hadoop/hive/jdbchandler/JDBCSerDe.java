@@ -256,6 +256,8 @@ public class JDBCSerDe implements SerDe {
     column.setDataLength(data.length);
     column.setRawData(data);
 
+    LOG.info("serializedField, typecode"+ typecode + ", data bytes length: " + data.length +" , data bytes: "+ data);
+
     return data;
   }
 
@@ -392,7 +394,7 @@ public class JDBCSerDe implements SerDe {
           String[] colInfo = columnSpecs[i].split("#");
 
           columnMapping.setColumnName(colInfo[0].split(":")[0]); // col1
-          String typeInfo = colInfo[0].split(":")[1]; // int(10)
+          String typeInfo = colInfo[0].split(":")[1]; // interger or integer(10)
 
           Pattern withLengthPtn = Pattern.compile("\\w+\\(\\d+\\)");
           Pattern withoutLengthPtn = Pattern.compile("\\w+");
@@ -408,14 +410,19 @@ public class JDBCSerDe implements SerDe {
             String typeName = typeInfo.toUpperCase();
             SQL2JavaTypeBridge.checkSQLType(typeName);
             columnMapping.setColumnType(typeName);
-         // default max column length 255
-            columnMapping.setColumnLength(255);
+         // if column length not specified, set to 0
+            columnMapping.setColumnLength(0);
           } else {
             throw new SerDeException(
                 "Error: jdbc.columns.mapping format error for this JDBC table. example: 'jdbc.columns.mapping'='col1:int(10)#col1comment,col2:varchar(255)#col2comment'. ");
           }
 
-          columnMapping.setColumnComments(colInfo[1]); // col1comment
+          if (colInfo.length == 1) {
+            // no comment in columnsMappingSpec
+            columnMapping.setColumnComments(null); // col1comment
+          }else if (colInfo.length == 2) {
+            columnMapping.setColumnComments(colInfo[1]); // col1comment
+          }
 
           result.add(columnMapping);
         }

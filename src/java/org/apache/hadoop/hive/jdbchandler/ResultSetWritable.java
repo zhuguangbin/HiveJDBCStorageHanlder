@@ -11,17 +11,22 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.jdbchandler.ResultSetByteArray.Column;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.lib.db.DBWritable;
 
 public class ResultSetWritable implements DBWritable, Writable {
 
+  private static final Log LOG = LogFactory.getLog(ResultSetWritable.class);
+
   private ResultSetByteArray rs = new ResultSetByteArray();
 
   @Override
   public void readFields(DataInput in) throws IOException {
     // TODO Auto-generated method stub\
+    LOG.info("---------readFields(DataInput in) start ---------------");
     int columnCount = in.readInt();
     rs.setColumnCount(columnCount);
 
@@ -36,8 +41,11 @@ public class ResultSetWritable implements DBWritable, Writable {
       column.setDataLength(dataLength);
       column.setRawData(rawData);
 
+      LOG.info("column "+ i +", colTypeCode: " + type +", data bytes length: "+ dataLength + ", data bytes: "+ rawData);
+
       columns.add(column);
     }
+    LOG.info("---------readFields(DataInput in) end---------------");
 
     rs.setColumns(columns);
   }
@@ -45,6 +53,7 @@ public class ResultSetWritable implements DBWritable, Writable {
   @Override
   public void write(DataOutput out) throws IOException {
     // TODO Auto-generated method stub
+    LOG.info("---------write(DataOutput out) start---------------");
     int columnCount = rs.getColumnCount();
     out.writeInt(columnCount);
 
@@ -52,54 +61,60 @@ public class ResultSetWritable implements DBWritable, Writable {
       out.writeInt(rs.getColumns().get(i - 1).getType());
       out.writeInt(rs.getColumns().get(i - 1).getDataLength());
       out.write(rs.getColumns().get(i - 1).getRawData());
+      LOG.info("column "+ i +", colTypeCode: " + rs.getColumns().get(i - 1).getType() +", data bytes length: "+ rs.getColumns().get(i - 1).getDataLength() + ", data bytes: " + rs.getColumns().get(i - 1).getRawData());
     }
 
+    LOG.info("---------write(DataOutput out) end---------------");
 
   }
 
   @Override
   public void write(PreparedStatement stmt) throws SQLException {
 
+    LOG.info("---------write(PreparedStatement stmt) start---------------");
+
     ParameterMetaData paramMetaData = stmt.getParameterMetaData();
     for (int i = 1; i <= paramMetaData.getParameterCount(); i++) {
 
-      String colTypeClass = paramMetaData.getParameterClassName(i);
-      int colTypeCode = paramMetaData.getParameterType(i);
-      String colTypeName = paramMetaData.getParameterTypeName(i);
-
+      int colTypeCode = rs.getColumns().get(i - 1).getType();
       byte[] colRawDataByteArray = rs.getColumns().get(i - 1).getRawData();
+      String colDataString = new String(colRawDataByteArray);
+
+      String colTypeClass = SQL2JavaTypeBridge.toJavaType(colTypeCode);
+
+      LOG.info("column "+ i +", colTypeCode: " + colTypeCode +", colTypeClass: " + colTypeClass +", data bytes length: "+ colRawDataByteArray.length + ", data bytes: "+ colRawDataByteArray);
 
       if (colTypeClass.equals(java.lang.Boolean.class.getCanonicalName())) {
-        stmt.setBoolean(i, ByteArray2PrimitiveBridge.toBoolean(colRawDataByteArray));
+        stmt.setBoolean(i, Boolean.parseBoolean(colDataString));
       } else if (colTypeClass.equals(java.lang.Integer.class.getCanonicalName())) {
-        stmt.setInt(i, ByteArray2PrimitiveBridge.toInt(colRawDataByteArray));
+        stmt.setInt(i, Integer.parseInt(colDataString));
       } else if (colTypeClass.equals(java.lang.Long.class.getCanonicalName())) {
-        stmt.setLong(i, ByteArray2PrimitiveBridge.toLong(colRawDataByteArray));
-      } else if (colTypeClass.equals(java.math.BigInteger.class.getCanonicalName())) {
-        stmt.setLong(i, ByteArray2PrimitiveBridge.toLong(colRawDataByteArray));
+        stmt.setLong(i, Long.parseLong(colDataString));
       } else if (colTypeClass.equals(java.math.BigDecimal.class.getCanonicalName())) {
-        stmt.setBigDecimal(i, BigDecimal.valueOf(ByteArray2PrimitiveBridge.toLong(colRawDataByteArray)));
+        stmt.setBigDecimal(i, BigDecimal.valueOf(Long.parseLong(colDataString)));
       } else if (colTypeClass.equals(java.lang.Float.class.getCanonicalName())) {
-        stmt.setFloat(i, ByteArray2PrimitiveBridge.toFloat(colRawDataByteArray));
+        stmt.setFloat(i, Float.parseFloat(colDataString));
       } else if (colTypeClass.equals(java.lang.Double.class.getCanonicalName())) {
-        stmt.setDouble(i, ByteArray2PrimitiveBridge.toDouble(colRawDataByteArray));
+        stmt.setDouble(i, Double.parseDouble(colDataString));
       } else if (colTypeClass.equals(java.lang.String.class.getCanonicalName())) {
-        stmt.setString(i, ByteArray2PrimitiveBridge.toString(colRawDataByteArray));
+        stmt.setString(i, colDataString);
       } else if (colTypeClass.equals(java.sql.Date.class.getCanonicalName())) {
-        stmt.setDate(i, java.sql.Date.valueOf(ByteArray2PrimitiveBridge.toString(colRawDataByteArray)));
+        stmt.setDate(i, java.sql.Date.valueOf(colDataString));
       } else if (colTypeClass.equals(java.sql.Time.class.getCanonicalName())) {
-        stmt.setTime(i, java.sql.Time.valueOf(ByteArray2PrimitiveBridge.toString(colRawDataByteArray)));
+        stmt.setTime(i, java.sql.Time.valueOf(colDataString));
       } else if (colTypeClass.equals(java.sql.Timestamp.class.getCanonicalName())) {
-        stmt.setTimestamp(i, java.sql.Timestamp.valueOf(ByteArray2PrimitiveBridge.toString(colRawDataByteArray)));
+        stmt.setTimestamp(i, java.sql.Timestamp.valueOf(colDataString));
       } else {
         stmt.setBytes(i, colRawDataByteArray);
       }
     }
+    LOG.info("---------write(PreparedStatement stmt) end---------------");
   }
 
   @Override
   public void readFields(ResultSet resultSet) throws SQLException {
-    // TODO Auto-generated method stub
+    LOG.info("---------readFields(ResultSet resultSet) start---------------");
+
     int colCount = resultSet.getMetaData().getColumnCount();
     rs.setColumnCount(colCount);
 
@@ -115,11 +130,14 @@ public class ResultSetWritable implements DBWritable, Writable {
       column.setDataLength(colBytes.length);
       column.setRawData(colBytes);
 
+      LOG.info("column "+ i +", colTypeCode: " + type +", data bytes length: "+ colBytes.length + ", data bytes: " + colBytes);
+
       columns.add(column);
 
     }
 
     rs.setColumns(columns);
+    LOG.info("---------readFields(ResultSet resultSet) end---------------");
 
   }
 

@@ -19,17 +19,21 @@ public class DBRecordWriter implements RecordWriter {
 
   private static final Log LOG = LogFactory.getLog(DBRecordWriter.class);
 
-  private final Connection connection;
-  private final PreparedStatement statement;
+  protected final Connection connection;
+  protected final PreparedStatement statement;
+  protected int batchSize = 1000;
+  private int count = 0;
 
-  protected DBRecordWriter(Connection connection, String tableName, String[] fieldNames, boolean truncate, boolean replace) {
+  protected DBRecordWriter(Connection connection, String tableName, String[] fieldNames,
+      boolean truncate, boolean replace) {
 
     try {
       this.connection = connection;
-      this.statement =  connection.prepareStatement(constructQuery(tableName, fieldNames, replace));
-      //NOTE: truncate operation is not in a transaction, when when insert exception, cannot rollback.
+      this.statement = connection.prepareStatement(constructQuery(tableName, fieldNames, replace));
+      // NOTE: truncate operation is not in a transaction, when when insert exception, cannot
+      // rollback.
       if (truncate) {
-        this.statement.addBatch("TRUNCATE TABLE "+tableName);
+        this.statement.addBatch("TRUNCATE TABLE " + tableName);
       }
       this.connection.setAutoCommit(false);
     } catch (SQLException e) {
@@ -41,9 +45,15 @@ public class DBRecordWriter implements RecordWriter {
   @Override
   public void write(Writable w) throws IOException {
     ResultSetWritable rs = (ResultSetWritable) w;
+
     try {
       rs.write(statement);
       statement.addBatch();
+      if (++count % batchSize == 0) {
+        LOG.info("statment added "+ count + " record. now trying to executeBatch");
+        statement.executeBatch();
+        LOG.info("statment writed "+ count + " record successfully.");
+      }
     } catch (SQLException e) {
       LOG.error(StringUtils.stringifyException(e));
       throw new IOException(StringUtils.stringifyException(e));
@@ -56,9 +66,12 @@ public class DBRecordWriter implements RecordWriter {
     // TODO Auto-generated method stub
     try {
       statement.executeBatch();
+      LOG.info("all "+count+" records written to db. now trying to commit.");
       connection.commit();
+      LOG.info("all "+count+" records written to db successfully. ");
     } catch (SQLException e) {
       try {
+        LOG.info("exception!!. now trying to rollback.");
         connection.rollback();
       } catch (SQLException ex) {
         LOG.error(StringUtils.stringifyException(ex));
@@ -68,8 +81,10 @@ public class DBRecordWriter implements RecordWriter {
       throw new IOException(StringUtils.stringifyException(e));
     } finally {
       try {
+        LOG.info("finally, close statment and connection.");
         statement.close();
         connection.close();
+        LOG.info("statment and connection closed successfully.");
       } catch (SQLException ex) {
         LOG.error(StringUtils.stringifyException(ex));
         throw new IOException(StringUtils.stringifyException(ex));

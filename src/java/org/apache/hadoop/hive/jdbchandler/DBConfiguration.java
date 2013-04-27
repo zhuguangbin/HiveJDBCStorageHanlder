@@ -22,12 +22,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 
-import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapred.lib.db.DBWritable;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.lib.db.DBInputFormat.NullDBWritable;
 
 /**
  * A container for configuration property names for jobs with DB input/output.
@@ -42,8 +39,6 @@ import org.apache.hadoop.mapreduce.lib.db.DBInputFormat.NullDBWritable;
  * @see DBInputFormat#setInput(Job, Class, String, String, String, String...)
  * @see DBOutputFormat#setOutput(Job, String, String...)
  */
-@InterfaceAudience.Public
-@InterfaceStability.Stable
 public class DBConfiguration {
 
   /** The JDBC Driver class name */
@@ -240,7 +235,7 @@ public class DBConfiguration {
 
   public Class<?> getInputClass() {
     return conf.getClass(DBConfiguration.INPUT_CLASS_PROPERTY,
-                         NullDBWritable.class);
+                         ResultSetWritable.class);
   }
 
   public void setInputClass(Class<? extends DBWritable> inputClass) {

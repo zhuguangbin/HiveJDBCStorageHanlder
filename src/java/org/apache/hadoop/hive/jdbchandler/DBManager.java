@@ -77,9 +77,14 @@ public class DBManager {
     StringBuilder query = new StringBuilder();
     query.append(" CREATE TABLE ").append(tableName).append(" (");
     for (ColumnMapping columnMapping : columnMappings) {
-      query.append(columnMapping.columnName).append(" ").append(columnMapping.columnType)
-          .append("(").append(columnMapping.columnLength).append(")")
-          .append(" COMMENT '").append(columnMapping.columnComments).append("',");
+      query.append(columnMapping.columnName).append(" ").append(columnMapping.columnType);
+      if (columnMapping.columnLength != 0) {
+        query.append("(").append(columnMapping.columnLength).append(")");
+      }
+      if (columnMapping.columnComments != null) {
+        query.append(" COMMENT '").append(columnMapping.columnComments).append("'");
+      }
+      query.append(",");
     }
     query.replace(query.lastIndexOf(","), query.lastIndexOf(",") + 1, ")");
 

@@ -110,7 +110,7 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
 
     // set reduce number to 1 and disable specutive execution due to database transaction: when job failed, roll back
     jobProperties.put("mapred.reduce.tasks", "1");
-    jobProperties.put("mapred.map.tasks.speculative.execution", "false");
+    jobProperties.put("hive.mapred.reduce.tasks.speculative.execution", "false");
   }
 
   @Override
@@ -119,14 +119,12 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
     // enable driver generate simplified parameter metadata for PreparedStatements
     // when no metadata is available either because the server couldn't support preparing the statement,
     // or server-side prepared statements are disabled
-    final String URLPARAMS = "&generateSimpleParameterMetadata=true";
-
     Properties tableProperties = tableDesc.getProperties();
 
     jobProperties.put(DBConfiguration.DRIVER_CLASS_PROPERTY,
         tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS));
     jobProperties.put(DBConfiguration.URL_PROPERTY,
-        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL)+URLPARAMS);
+        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL));
 
     jobProperties.put(JDBCSerDe.JDBC_TABLE_NAME,
           tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME));

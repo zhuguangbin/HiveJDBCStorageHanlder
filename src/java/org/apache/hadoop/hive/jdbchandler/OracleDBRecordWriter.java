@@ -11,8 +11,8 @@ public class OracleDBRecordWriter extends DBRecordWriter {
   private static final Log LOG = LogFactory.getLog(OracleDBRecordWriter.class);
 
   protected OracleDBRecordWriter(Connection connection, String tableName, String[] fieldNames,
-      boolean truncate, boolean replace) {
-    super(connection, tableName, fieldNames, truncate, replace);
+      boolean truncate, boolean replace, int batchSize) {
+    super(connection, tableName, fieldNames, truncate, replace, batchSize);
   }
 
 }

@@ -11,8 +11,8 @@ public class MySQLDBRecordWriter extends DBRecordWriter {
   private static final Log LOG = LogFactory.getLog(MySQLDBRecordWriter.class);
 
   protected MySQLDBRecordWriter(Connection connection, String tableName, String[] fieldNames,
-      boolean truncate, boolean replace) {
-    super(connection, tableName, fieldNames, truncate, replace);
+      boolean truncate, boolean replace, int batchSize) {
+    super(connection, tableName, fieldNames, truncate, replace, batchSize);
   }
 
 
@@ -49,9 +49,8 @@ public class MySQLDBRecordWriter extends DBRecordWriter {
       }
     }
     query.append(");");
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Insert Query: " + query.toString());
-    }
+
+    LOG.info("Insert Query: " + query.toString());
 
     return query.toString();
   }

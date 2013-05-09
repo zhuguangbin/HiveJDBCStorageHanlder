@@ -1,5 +1,6 @@
 package org.apache.hadoop.hive.jdbchandler;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -12,6 +13,8 @@ import org.apache.hadoop.hive.metastore.HiveMetaHook;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.ql.index.IndexPredicateAnalyzer;
+import org.apache.hadoop.hive.ql.index.IndexSearchCondition;
 import org.apache.hadoop.hive.ql.metadata.DefaultStorageHandler;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.HiveStoragePredicateHandler;
@@ -39,7 +42,25 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
   public DecomposedPredicate decomposePredicate(JobConf jobConf, Deserializer deserializer,
       ExprNodeDesc predicate) {
     // TODO Auto-generated method stub
-    return null;
+    IndexPredicateAnalyzer analyzer = new IndexPredicateAnalyzer();
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqual");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqualOrGreaterThan");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqualOrLessThan");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPLessThan");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPGreaterThan");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFIn");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFBetween");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNot");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNotNull");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNull");
+    analyzer.addComparisonOp("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPNotEqual");
+
+    List<IndexSearchCondition> searchConditions = new ArrayList<IndexSearchCondition>();
+    ExprNodeDesc residualPredicate = analyzer.analyzePredicate(predicate, searchConditions);
+    DecomposedPredicate decomposedPredicate = new DecomposedPredicate();
+    decomposedPredicate.pushedPredicate = analyzer.translateSearchConditions(searchConditions);
+    decomposedPredicate.residualPredicate = residualPredicate;
+    return decomposedPredicate;
   }
 
 
@@ -106,9 +127,11 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
     String tableName = tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME);
 
     jobProperties.put(DBConfiguration.OUTPUT_TABLE_NAME_PROPERTY, tableName);
-    jobProperties.put(DBConfiguration.OUTPUT_FIELD_NAMES_PROPERTY, tableProperties.getProperty(org.apache.hadoop.hive.serde.Constants.LIST_COLUMNS));
+    jobProperties.put(DBConfiguration.OUTPUT_FIELD_NAMES_PROPERTY,
+        tableProperties.getProperty(org.apache.hadoop.hive.serde.Constants.LIST_COLUMNS));
 
-    // set reduce number to 1 and disable specutive execution due to database transaction: when job failed, roll back
+    // set reduce number to 1 and disable specutive execution due to database transaction: when job
+    // failed, roll back
     jobProperties.put("mapred.reduce.tasks", "1");
     jobProperties.put("hive.mapred.reduce.tasks.speculative.execution", "false");
   }
@@ -116,20 +139,24 @@ public class JDBCStorageHandler extends DefaultStorageHandler implements HiveMet
   @Override
   public void configureTableJobProperties(TableDesc tableDesc, Map<String, String> jobProperties) {
 
-    // enable driver generate simplified parameter metadata for PreparedStatements
-    // when no metadata is available either because the server couldn't support preparing the statement,
-    // or server-side prepared statements are disabled
     Properties tableProperties = tableDesc.getProperties();
 
     jobProperties.put(DBConfiguration.DRIVER_CLASS_PROPERTY,
-        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS));
-    jobProperties.put(DBConfiguration.URL_PROPERTY,
-        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL));
+        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS) == null ? ""
+            : tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_DRIVER_CLASS));
+    jobProperties.put(
+        DBConfiguration.URL_PROPERTY,
+        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_URL) == null ? "" : tableProperties
+            .getProperty(JDBCSerDe.JDBC_TABLE_URL));
 
-    jobProperties.put(JDBCSerDe.JDBC_TABLE_NAME,
-          tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME));
-    jobProperties.put(JDBCSerDe.JDBC_COLUMNS_MAPPING,
-        tableProperties.getProperty(JDBCSerDe.JDBC_COLUMNS_MAPPING) == null ? "":tableProperties.getProperty(JDBCSerDe.JDBC_COLUMNS_MAPPING));
+    jobProperties.put(
+        JDBCSerDe.JDBC_TABLE_NAME,
+        tableProperties.getProperty(JDBCSerDe.JDBC_TABLE_NAME) == null ? "" : tableProperties
+            .getProperty(JDBCSerDe.JDBC_TABLE_NAME));
+    jobProperties.put(
+        JDBCSerDe.JDBC_COLUMNS_MAPPING,
+        tableProperties.getProperty(JDBCSerDe.JDBC_COLUMNS_MAPPING) == null ? "" : tableProperties
+            .getProperty(JDBCSerDe.JDBC_COLUMNS_MAPPING));
 
   }
 

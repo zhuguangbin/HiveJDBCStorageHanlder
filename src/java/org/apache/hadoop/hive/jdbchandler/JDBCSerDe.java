@@ -251,12 +251,10 @@ public class JDBCSerDe implements SerDe {
     byte[] data = new byte[serializeStream.getCount()];
     System.arraycopy(serializeStream.getData(), 0, data, 0, serializeStream.getCount());
 
-    int typecode = SQL2JavaTypeBridge.toSQLTypeCode(colMap.getColumnType());
+    int typecode = TypeBridge.toSQLTypeCode(colMap.getColumnType());
     column.setType(typecode);
     column.setDataLength(data.length);
     column.setRawData(data);
-
-    LOG.info("serializedField, typecode"+ typecode + ", data bytes length: " + data.length +" , data bytes: "+ data);
 
     return data;
   }
@@ -400,7 +398,7 @@ public class JDBCSerDe implements SerDe {
           Pattern withoutLengthPtn = Pattern.compile("\\w+");
           if (withLengthPtn.matcher(typeInfo).matches()) {
             String typeName = typeInfo.substring(0, typeInfo.indexOf("(")).toUpperCase();
-            SQL2JavaTypeBridge.checkSQLType(typeName);
+            TypeBridge.checkSQLType(typeName);
             int colLength = Integer.parseInt(typeInfo.substring(
                 typeInfo.indexOf("(") + 1, typeInfo.indexOf(")")));
             columnMapping.setColumnType(typeName);
@@ -408,7 +406,7 @@ public class JDBCSerDe implements SerDe {
 
           } else if (withoutLengthPtn.matcher(typeInfo).matches()) {
             String typeName = typeInfo.toUpperCase();
-            SQL2JavaTypeBridge.checkSQLType(typeName);
+            TypeBridge.checkSQLType(typeName);
             columnMapping.setColumnType(typeName);
          // if column length not specified, set to 0
             columnMapping.setColumnLength(0);

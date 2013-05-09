@@ -8,13 +8,19 @@ import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.jdbchandler.JDBCSerDe.ColumnMapping;
+import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveInputFormat;
+import org.apache.hadoop.hive.ql.plan.MapredWork;
+import org.apache.hadoop.hive.ql.plan.TableScanDesc;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
 import org.apache.hadoop.hive.serde2.SerDeException;
 import org.apache.hadoop.io.LongWritable;
@@ -84,11 +90,34 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
         }
       }
     }
-    conditions = dbConf.getInputConditions();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("HiveDBInputFormat params : dbProductName=" + dbProductName + ", tableName="
-          + tableName + ", fieldNames=" + fieldNames + ", conditions=" + conditions);
+    conditions = convertFilter(conf);
+    LOG.info("HiveDBInputFormat params : dbProductName=" + dbProductName + ", tableName="
+        + tableName + ", fieldNames=" + Arrays.toString(fieldNames) + ", conditions=" + conditions);
+  }
+
+  private String convertFilter(JobConf job) {
+
+    try {
+      MapredWork mrwork = Utilities.getMapRedWork(job);
+
+      List<String> aliases = mrwork.getPathToAliases().get(FileInputFormat.getInputPaths(job)[0].toString());
+      LOG.info("input dir: "+FileInputFormat.getInputPaths(job)[0] + ", aliases: "+Arrays.asList(aliases));
+      if ((aliases != null) && (aliases.size() == 1)) {
+        Operator op = mrwork.getAliasToWork().get(aliases.get(0));
+        if ((op != null) && (op instanceof TableScanOperator)) {
+          TableScanOperator tableScan = (TableScanOperator) op;
+          LOG.info("filter push down");
+          pushFilters(job, tableScan);
+        }
+      }
+    } catch (Exception e) {
+      // TODO: handle exception
+      LOG.warn(StringUtils.stringifyException(e));
     }
+
+    return job.get(TableScanDesc.FILTER_TEXT_CONF_STR);
+
+
   }
 
   @Override
@@ -153,6 +182,11 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
         return new MySQLDBRecordReader((DBInputSplit) split, inputClass,
             conf, getConnection(), getDBConf(), conditions, fieldNames,
             tableName);
+      } else if (dbProductName.startsWith("POSTGRESQL")) {
+        // use PostgreSQL-specific db reader.
+        return new PostgresDBRecordReader((DBInputSplit) split, inputClass,
+            conf, getConnection(), getDBConf(), conditions, fieldNames,
+            tableName);
       } else {
         // Generic reader.
         return new DBRecordReader((DBInputSplit) split, inputClass,
@@ -182,9 +216,7 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
     if (conditions != null && conditions.length() > 0) {
       query.append(" WHERE " + conditions);
     }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Count Query: " + query.toString());
-    }
+    LOG.info("Count Query: " + query.toString());
     return query.toString();
   }
 
@@ -194,13 +226,11 @@ public class HiveDBInputFormat extends HiveInputFormat<LongWritable, ResultSetWr
 
   public Connection getConnection() {
     try {
-      if (null == this.connection) {
         // The connection was closed; reinstantiate it.
         this.connection = dbConf.getConnection();
         this.connection.setAutoCommit(false);
         this.connection.setTransactionIsolation(
             Connection.TRANSACTION_SERIALIZABLE);
-      }
     } catch (Exception e) {
       LOG.error(StringUtils.stringifyException(e));
       throw new RuntimeException(StringUtils.stringifyException(e));

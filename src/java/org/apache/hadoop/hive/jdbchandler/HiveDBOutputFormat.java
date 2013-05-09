@@ -62,6 +62,7 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
     String[] fieldNames = dbConf.getOutputFieldNames();
     boolean truncate = dbConf.getTruncateBeforeInsert();
     boolean replace = dbConf.getOutputReplace();
+    int batchSize = dbConf.getBatchExecuteSize();
     Connection connection = null;
 
     try {
@@ -72,13 +73,16 @@ public class HiveDBOutputFormat<K extends Writable, V extends ResultSetWritable>
       // use database product name to determine appropriate record writer.
       if (dbProductName.startsWith("ORACLE")) {
         // use Oracle-specific db writer.
-        return new OracleDBRecordWriter(connection, tableName, fieldNames, truncate, replace);
+        return new OracleDBRecordWriter(connection, tableName, fieldNames, truncate, replace, batchSize);
       } else if (dbProductName.startsWith("MYSQL")) {
         // use MySQL-specific db writer.
-        return new MySQLDBRecordWriter(connection, tableName, fieldNames, truncate, replace);
+        return new MySQLDBRecordWriter(connection, tableName, fieldNames, truncate, replace, batchSize);
+      } else if (dbProductName.startsWith("POSTGRESQL")) {
+        // use PostgreSQL-specific db writer.
+        return new PostgresDBRecordWriter(connection, tableName, fieldNames, truncate, replace, batchSize);
       } else {
         // Generic writer.
-        return new DBRecordWriter(connection, tableName, fieldNames, truncate, replace);
+        return new DBRecordWriter(connection, tableName, fieldNames, truncate, replace, batchSize);
       }
 
     } catch (SQLException e) {

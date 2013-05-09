@@ -97,9 +97,7 @@ public class DBRecordReader<T extends DBWritable> implements RecordReader<LongWr
 
     query.append(" LIMIT ").append(split.getLength());
     query.append(" OFFSET ").append(split.getStart());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Select Query : " + query.toString());
-    }
+    LOG.info("Select Query : " + query.toString());
     return query.toString();
   }
 

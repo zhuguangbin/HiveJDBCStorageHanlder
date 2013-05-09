@@ -69,6 +69,8 @@ public class OracleDBRecordReader extends DBRecordReader<DBWritable> {
       query.append(" ) WHERE dbif_rno >= ").append(split.getStart());
     }
 
+    LOG.info("Insert Query: " + query.toString());
+
     return query.toString();
   }
 

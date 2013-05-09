@@ -106,6 +106,10 @@ public class DBConfiguration {
   public static final String OUTPUT_RELPACE_PROPERTY =
       "mapreduce.jdbc.output.replace";
 
+  /** batch execution size   */
+  public static final String OUTPUT_BATCHSIZE_PROPERTY =
+      "mapreduce.jdbc.output.batchexecute.size";
+
   /**
    * Sets the DB access related fields in the {@link Configuration}.
    * @param conf the configuration
@@ -281,6 +285,14 @@ public class DBConfiguration {
 
   public boolean getTruncateBeforeInsert(){
     return conf.getBoolean(DBConfiguration.OUTPUT_TRUNCATE_PROPERTY, false);
+  }
+
+  public void setBatchExecuteSize(int batchSize){
+    conf.setInt(DBConfiguration.OUTPUT_BATCHSIZE_PROPERTY, batchSize);
+  }
+
+  public int getBatchExecuteSize(){
+    return conf.getInt(DBConfiguration.OUTPUT_BATCHSIZE_PROPERTY, 1000);
   }
 
 }

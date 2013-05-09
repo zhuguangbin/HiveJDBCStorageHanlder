@@ -21,17 +21,17 @@ public class DBRecordWriter implements RecordWriter {
 
   protected final Connection connection;
   protected final PreparedStatement statement;
-  protected int batchSize = 1000;
+  protected int batchSize = 1;
   private int count = 0;
 
   protected DBRecordWriter(Connection connection, String tableName, String[] fieldNames,
-      boolean truncate, boolean replace) {
+      boolean truncate, boolean replace, int batchSize) {
 
     try {
       this.connection = connection;
       this.statement = connection.prepareStatement(constructQuery(tableName, fieldNames, replace));
-      // NOTE: truncate operation is not in a transaction, when when insert exception, cannot
-      // rollback.
+      this.batchSize = batchSize;
+      // NOTE: truncate operation is not in a transaction, when when insert exception, cannot rollback.
       if (truncate) {
         this.statement.addBatch("TRUNCATE TABLE " + tableName);
       }
@@ -130,9 +130,7 @@ public class DBRecordWriter implements RecordWriter {
       }
     }
     query.append(");");
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Insert Query: " + query.toString());
-    }
+    LOG.info("Insert Query: " + query.toString());
 
     return query.toString();
   }
